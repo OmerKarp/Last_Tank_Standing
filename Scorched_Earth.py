@@ -50,9 +50,11 @@ background = pygame.image.load("assets/bg.jpg").convert_alpha()
 background = pygame.transform.scale(background, (screen_width, screen_height))
 space_background = pygame.image.load("assets/space_background.png").convert_alpha()
 space_background = pygame.transform.scale(space_background, (screen_width, screen_height))
+music_on_picture = pygame.image.load("assets/white_musicOn.png").convert_alpha()
+music_off_picture = pygame.image.load("assets/white_musicOff.png").convert_alpha()
 # -----------------------------------------------------------------------------------------------------------------
 helicopter_sound = pygame.mixer.Sound("assets/sounds/helicopter_sound.mp3")
-helicopter_sound.set_volume(1)
+helicopter_sound.set_volume(0.7)
 hit_sound = pygame.mixer.Sound("assets/sounds/hit_sound.mp3")
 hit_sound.set_volume(1)
 upgrade_sound = pygame.mixer.Sound("assets/sounds/upgrade_sound.mp3")
@@ -63,6 +65,7 @@ shoot_sound = pygame.mixer.Sound("assets/sounds/gun_shoot.mp3")
 change_ammo_sound = pygame.mixer.Sound("assets/sounds/reload.mp3")
 moving_sound = pygame.mixer.Sound("assets/sounds/move.mp3")
 click_sound = pygame.mixer.Sound("assets/sounds/click_sound.mp3")
+no_sound = pygame.mixer.Sound("assets/sounds/no_sound.mp3")
 background_music = pygame.mixer.Sound("assets/sounds/background_music.mp3")
 risk = pygame.mixer.Sound("assets/sounds/risk.mp3")
 cinematic = pygame.mixer.Sound("assets/sounds/cinematic.mp3")
@@ -70,10 +73,9 @@ cinematic = pygame.mixer.Sound("assets/sounds/cinematic.mp3")
 
 tracks = [background_music, risk, cinematic]
 tracks_index = 1
-background_music.set_volume(0.6)
+music_status = "on"
 
 font = pygame.font.Font(None, 30)
-
 
 # -----------------------------------------------------------------------------------------------------------------
 
@@ -164,6 +166,11 @@ class Tank(pygame.sprite.Sprite):
                 self.tank_rect.x += self.velocity_x
                 self.update_image(direction)
             self.fuel -= 1
+        else:
+            if direction == "left":
+                self.update_image(direction)
+            elif direction == "right":
+                self.update_image(direction)
 
     # -----------------------------------------------------------------------------------------------------------------
 
@@ -185,7 +192,7 @@ class Tank(pygame.sprite.Sprite):
         collided_object = collision(self.tank_rect, floor_rect + underground_rect)
         if collided_object is not None:
             if self.velocity_y > 5:
-                self.hit(3 * int(self.velocity_y))
+                self.hit(3 * int(self.velocity_y*(self.max_health/100)))
             self.velocity_y = 0
             self.fall_count = 0
             self.tank_rect.bottom = collided_object.top
@@ -226,7 +233,7 @@ class Tank(pygame.sprite.Sprite):
         velocity_y = self.gun_power * math.sin(self.gun_angle * (math.pi / 180))
         acceleration = 0.2
 
-        max_time = 10
+        max_time = 8
 
         for time in range(0, max_time):
             x = initial_x + velocity_x * time
@@ -397,6 +404,8 @@ class Helicopter(pygame.sprite.Sprite):
         if self.rect.left >= screen_width:
             self.die()
 
+    # -----------------------------------------------------------------------------------------------------------------
+
     def draw(self):
         screen.blit(self.sprite, self.rect)
 
@@ -453,13 +462,13 @@ class Box(pygame.sprite.Sprite):
         show_picked_item = [tank.name, self.powerup, 100]
         if self.powerup == "health":
             missing_health = tank.max_health - tank.health
-            heal = tank.max_health // 5
+            heal = tank.max_health // 3
             if missing_health < heal:
                 heal = missing_health
             tank.health += heal
             pick_up_sound.play()
         elif self.powerup == "shield":
-            tank.shield = tank.max_health // 3
+            tank.shield = 50
             pick_up_sound.play()
         elif self.powerup == "HE1":
             tank.ammo_count["HE1"] += 1
@@ -533,6 +542,9 @@ def display_stats(screen, current_tank):
     screen.blit(text, (35, 35))
     text = font.render("Health: " + str(current_tank.health) + "/" + str(current_tank.max_health), True, '#FDDC5C')
     screen.blit(text, (35, 65))
+    if current_tank.shield > 0:
+        text = font.render("Shield: " + str(current_tank.shield), True, '#FDDC5C')
+        screen.blit(text, (200, 65))
     text = font.render("Fuel: " + str(current_tank.fuel) + "/" + str(current_tank.max_fuel), True, '#FDDC5C')
     screen.blit(text, (35, 95))
     text = font.render("Gun Power: " + str(current_tank.gun_power), True, '#FDDC5C')
@@ -547,34 +559,68 @@ def display_stats(screen, current_tank):
     big_HE3 = pygame.transform.scale2x(HE3)
 
     for i in range(int(current_tank.ammo_count['HE1'])):
-        screen.blit(big_HE1, (screen_width - 65 - 35 * i, 35))
+        screen.blit(big_HE1, (screen_width - 95 - 35 * i, 35))
     for i in range(int(current_tank.ammo_count['HE2'])):
-        screen.blit(big_HE2, (screen_width - 65 - 35 * i, 75))
+        screen.blit(big_HE2, (screen_width - 95 - 35 * i, 75))
     for i in range(int(current_tank.ammo_count['HE3'])):
-        screen.blit(big_HE3, (screen_width - 65 - 35 * i, 115))
+        screen.blit(big_HE3, (screen_width - 95 - 35 * i, 115))
 
+    if current_tank.arsenal[current_tank.arsenal_index] == 'HE1':
+        pygame.draw.circle(screen, "Purple", (screen_width - 45,55), 10)
+    elif current_tank.arsenal[current_tank.arsenal_index] == 'HE2':
+        pygame.draw.circle(screen, "Purple", (screen_width - 45,95), 10)
+    elif current_tank.arsenal[current_tank.arsenal_index] == 'HE3':
+        pygame.draw.circle(screen, "Purple", (screen_width - 45,135), 10)
 
 # -----------------------------------------------------------------------------------------------------------------
 
 def between_rounds_screen():
-    global tanks_playing, tanks, screen, floor_rect, underground_rect, level_number, space_background
-    background_music.set_volume(0.3)
-    risk.set_volume(0.3)
+    global tanks_playing, tanks, screen, floor_rect, underground_rect, level_number, space_background, tracks_index, wins, best_of
+    tracks[tracks_index].set_volume(0.2)
     channel2.stop()
     font = pygame.font.Font(None, 50)
     font_mid = pygame.font.Font(None, 75)
     font_big = pygame.font.Font(None, 100)
 
+    if len(tanks_playing.sprites()) == 1:
+        i = tanks.sprites().index(tanks_playing.sprites()[0])
+        wins[i] += 1
+
+    for tank in tanks.sprites():
+        i = tanks.sprites().index(tank)
+        if best_of == "3 rounds":
+            if wins[i] >= 3:
+                ending_screen(tank)
+                return
+        elif best_of == "5 rounds":
+            if wins[i] >= 5:
+                ending_screen(tank)
+                return
+        elif best_of == "7 rounds":
+            if wins[i] >= 7:
+                ending_screen(tank)
+                return
+        elif best_of == "10 rounds":
+            if wins[i] >= 10:
+                ending_screen(tank)
+                return
+
+
     for i in range(len(tanks.sprites())):
         buying = True
-        if tanks.sprites()[i] == tanks_playing.sprites()[0]:
-            tanks.sprites()[i].money += int(1.3 * (100 + (50 * (current_round - 1))))
+        if tanks.sprites()[i] in tanks_playing.sprites():
+            base = 100 + (50 * (current_round - 1))
+            bonus = ((100 + 50 * (current_round - 1)) * 0.3)/len(tanks_playing.sprites())
+            tanks.sprites()[i].money += int(base + bonus)
         else:
             tanks.sprites()[i].money += 100 + (50 * (current_round - 1))
         while buying:
             screen.blit(space_background, (0, 0))
 
-            text = font_big.render(f"PLAYER {tanks_playing.sprites()[0].name} WON!!!", True, "Cyan")
+            if len(tanks_playing.sprites()) == 1:
+                text = font_big.render(f"PLAYER {tanks_playing.sprites()[0].name} WON!!!", True, "Cyan")
+            else:
+                text = font_big.render("THE ROUND WAS A DRAW", True, "Cyan")
             text_rect = text.get_rect(center=(screen_width / 2, 100))
             screen.blit(text, text_rect)
 
@@ -584,8 +630,14 @@ def between_rounds_screen():
             # top
             text = font.render(f"HP +30 [COST {int(tanks.sprites()[i].max_health / 2)}     PRESS H]", True, "Red")
             screen.blit(text, (screen_width / 2 - 400, screen_height / 2 - 100))
+            if tanks.sprites()[i].max_health == 250:
+                text = font.render("MAX OUT", True, "Red")
+                screen.blit(text, (screen_width / 2 + 200, screen_height / 2 - 100))
             text = font.render(f"FUEL +30 [COST {int(tanks.sprites()[i].max_fuel / 2)}    PRESS F]", True, "Black")
             screen.blit(text, (screen_width / 2 - 400, screen_height / 2))
+            if tanks.sprites()[i].max_fuel == 140:
+                text = font.render("MAX OUT", True, "Black")
+                screen.blit(text, (screen_width / 2 + 200, screen_height / 2))
             text = font.render(f"HE1_AMMO +1 [COST 30]     PRESS 1", True, "Green")
             screen.blit(text, (screen_width / 2 - 400, screen_height / 2 + 100))
             text = font.render(f"HE2_AMMO +1 [COST 50]     PRESS 2", True, "Green")
@@ -607,36 +659,45 @@ def between_rounds_screen():
                         buying = False
                     if event.key == pygame.K_h:
                         if int(tanks.sprites()[i].max_health / 2) <= tanks.sprites()[i].money:
-                            upgrade_sound.play()
-                            tanks.sprites()[i].money -= int(tanks.sprites()[i].max_health / 2)
-                            tanks.sprites()[i].max_health += 30
+                            if tanks.sprites()[i].max_health < 250:
+                                upgrade_sound.play()
+                                tanks.sprites()[i].money -= int(tanks.sprites()[i].max_health / 2)
+                                tanks.sprites()[i].max_health += 30
+                            else:
+                                no_sound.play()
                     if event.key == pygame.K_f:
                         if int(tanks.sprites()[i].max_fuel / 2) <= tanks.sprites()[i].money:
-                            upgrade_sound.play()
-                            tanks.sprites()[i].money -= int(tanks.sprites()[i].max_fuel / 2)
-                            tanks.sprites()[i].max_fuel += 30
+                            if tanks.sprites()[i].max_fuel < 140:
+                                upgrade_sound.play()
+                                tanks.sprites()[i].money -= int(tanks.sprites()[i].max_fuel / 2)
+                                tanks.sprites()[i].max_fuel += 30
+                            else:
+                                no_sound.play()
                     if event.key == pygame.K_1:
                         if 30 <= tanks.sprites()[i].money:
                             tanks.sprites()[i].money -= 30
                             tanks.sprites()[i].ammo_count["HE1"] += 1
+                            change_ammo_sound.play()
                     if event.key == pygame.K_2:
                         if 50 <= tanks.sprites()[i].money:
                             tanks.sprites()[i].money -= 50
                             tanks.sprites()[i].ammo_count["HE2"] += 1
+                            change_ammo_sound.play()
                     if event.key == pygame.K_3:
                         if 100 <= tanks.sprites()[i].money:
                             tanks.sprites()[i].money -= 100
                             tanks.sprites()[i].ammo_count["HE3"] += 1
-
+                            change_ammo_sound.play()
             pygame.display.update()
             clock.tick(60)
 
-    floor_rect, underground_rect, _, spawn_points, level_number = get_random_level(level_number)
+    floor_rect, underground_rect, _, spawn_points, level_number, tracks_index = get_random_level(level_number, tracks_index)
 
     for i, tank in enumerate(tanks.sprites()):
         tank.health = tank.max_health
         tank.fuel = tank.max_fuel
         tank.velocity_y = 0
+        tank.shield = 0
         tanks_playing = tanks.copy()
         tank.x = spawn_points[i][0]
         tank.y = spawn_points[i][1]
@@ -649,9 +710,9 @@ def between_rounds_screen():
 
     bullets.empty()
     boxes.empty()
-    background_music.set_volume(0.6)
-    risk.set_volume(0.6)
-
+    channel1.fadeout(1)
+    channel1.play(tracks[tracks_index], -1)
+    tracks[tracks_index].set_volume(0.6)
 
 # -----------------------------------------------------------------------------------------------------------------
 
@@ -713,7 +774,7 @@ def sandbox_menu():
 # -----------------------------------------------------------------------------------------------------------------
 
 def back_to_main_menu():
-    global show_picked_item, tanks, tanks_playing, heli, was_helicopter, floor_rect, underground_rect, terrain, spawn_points, level_number
+    global show_picked_item, tanks, tanks_playing, heli, was_helicopter, floor_rect, underground_rect, terrain, spawn_points, level_number, music_status, current_round, wins
     pygame.mixer.pause()
     font_big = pygame.font.Font(None, 80)
     font_big_big = pygame.font.Font(None, 150)
@@ -737,6 +798,9 @@ def back_to_main_menu():
         screen.blit(text, text_rect)
 
         for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.mixer.unpause()
@@ -757,21 +821,25 @@ def back_to_main_menu():
                     bullets.empty()
                     boxes.empty()
 
+                    current_round = 1
+
                     number_of_players, yes_or_no, names = starting_screen()
 
                     if yes_or_no == "YES":
                         draw_level()
 
-                    floor_rect, underground_rect, terrain, spawn_points, level_number = get_random_level()
+                    floor_rect, underground_rect, terrain, spawn_points, level_number, tracks_index = get_random_level()
 
                     tanks = pygame.sprite.Group()
                     if number_of_players == 2:
                         tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
                         tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
+                        wins = [0,0]
                     elif number_of_players == 3:
                         tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
                         tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
                         tanks.add(Tank(spawn_points[2][0], spawn_points[2][1], names[2]))
+                        wins = [0,0,0]
 
                     tanks_playing = tanks.copy()
 
@@ -781,6 +849,7 @@ def back_to_main_menu():
                     was_helicopter = True
 
                     channel1.play(tracks[tracks_index], -1)
+                    music_status = "on"
 
                     return False
 
@@ -792,7 +861,7 @@ def back_to_main_menu():
 
 
 def show_menu():
-    global space_background
+    global space_background, music_status
     pygame.mixer.pause()
     while True:
         # top
@@ -819,11 +888,11 @@ def show_menu():
         screen.blit(text, text_rect)
 
         text = font.render("HOW TO PLAY:", True, "RED")
-        text_rect = text.get_rect(center=(screen_width / 2 - 600, 425))
+        text_rect = text.get_rect(center=(screen_width / 2 - 600, 450))
         screen.blit(text, text_rect)
 
         text = font.render("Press A/D to move the tank left/right (as long as you have enough fuel)", True, "#FFBA00")
-        text_rect = text.get_rect(center=(screen_width / 2 + 110, 425))
+        text_rect = text.get_rect(center=(screen_width / 2 + 110, 450))
         screen.blit(text, text_rect)
 
         text = font.render("Press W/S to rotate the gun up/down (cannot go over 90 or under -60 degrees)", True,
@@ -832,29 +901,53 @@ def show_menu():
         screen.blit(text, text_rect)
 
         text = font.render("Press UP/DOWN keys to add/remove power (cannot go over 10 or under 6)", True, "#FFBA00")
-        text_rect = text.get_rect(center=(screen_width / 2, 575))
+        text_rect = text.get_rect(center=(screen_width / 2, 550))
         screen.blit(text, text_rect)
 
         text = font.render("Press LEFT/RIGHT keys to change ammo type", True, "#FFBA00")
-        text_rect = text.get_rect(center=(screen_width / 2, 650))
+        text_rect = text.get_rect(center=(screen_width / 2, 600))
         screen.blit(text, text_rect)
 
         text = font.render("Press SPASS to shoot OR Press ENTER to skip the turn", True, "#FFBA00")
-        text_rect = text.get_rect(center=(screen_width / 2, 725))
+        text_rect = text.get_rect(center=(screen_width / 2, 650))
         screen.blit(text, text_rect)
 
         text = font.render("Press 9 to go back to starting screen", True, "#FFBA00")
-        text_rect = text.get_rect(center=(screen_width / 2, 825))
+        text_rect = text.get_rect(center=(screen_width / 2, 750))
+        screen.blit(text, text_rect)
+
+        text = font.render("Press 8 for a draw offer", True, "#FFBA00")
+        text_rect = text.get_rect(center=(screen_width / 2, 800))
+        screen.blit(text, text_rect)
+
+        text = font.render("Press TAB to look at the score board", True, "#FFBA00")
+        text_rect = text.get_rect(center=(screen_width / 2, 700))
         screen.blit(text, text_rect)
 
         text = font.render("press ESC to exit", True, "RED")
         screen.blit(text, (screen_width - 300, screen_height - 35))
+
+        if music_status == 'off':
+            music_rect = music_off_picture.get_rect(center=(120, screen_height - 120))
+            screen.blit(music_off_picture, music_rect)
+        else:
+            music_rect = music_on_picture.get_rect(center = (120, screen_height - 120))
+            screen.blit(music_on_picture, music_rect)
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.mixer.unpause()
                     return
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if music_rect.collidepoint(mouse_pos):
+                    if music_status == "off":
+                        music_status = "on"
+                        channel1.set_volume(0.6)
+                    else:
+                        music_status = "off"
+                        channel1.set_volume(0)
 
         pygame.display.update()
         clock.tick(10)
@@ -863,8 +956,9 @@ def show_menu():
 # -----------------------------------------------------------------------------------------------------------------
 
 def starting_screen():
-    global space_background
+    global space_background, best_of
     number_of_players = 2
+    best_of = "3 rounds"
     yes_or_no = "NO"
     name1 = "Alice"
     name2 = "Bob"
@@ -887,13 +981,22 @@ def starting_screen():
         text_rect = text.get_rect(center=(screen_width / 2, screen_height / 2 - 300))
         screen.blit(text, text_rect)
 
-        text = font.render("press ENTER to start", True, "#FFBA00")
-        screen.blit(text, (screen_width - 400, screen_height - 200))
+        text = font.render("best of: ", True, "#FFBA00")
+        text_rect = text.get_rect(center=(screen_width / 2 + 400, screen_height / 2 - 100))
+        screen.blit(text, text_rect)
 
         text = font_big.render(f"{number_of_players}", True, (205, 205, 105))
         text_rect_players = text.get_rect(center=(screen_width / 2, screen_height / 2 - 100))
         screen.blit(text, text_rect_players)
         pygame.draw.rect(screen, (50, 50, 50), text_rect_players, 2)
+
+        text = font.render("press ENTER to start", True, "#FFBA00")
+        screen.blit(text, (screen_width - 400, screen_height - 100))
+
+        text = font.render(f"{best_of}", True, (205, 205, 105))
+        text_rect_best_of = text.get_rect(center=(screen_width / 2 + 550, screen_height / 2 - 100))
+        screen.blit(text, text_rect_best_of)
+        pygame.draw.rect(screen, (50, 50, 50), text_rect_best_of, 2)
 
         text = font.render("Enter name for tank 1:", True, "#FFBA00")
         text_rect = text.get_rect(topleft=(50, screen_height / 2 - 150))
@@ -984,6 +1087,22 @@ def starting_screen():
                     else:
                         yes_or_no = "YES"
                         click_sound.play()
+                elif text_rect_best_of.collidepoint(mouse_pos):
+                    if best_of == "3 rounds":
+                        best_of = "5 rounds"
+                        click_sound.play()
+                    elif best_of == "5 rounds":
+                        best_of = "7 rounds"
+                        click_sound.play()
+                    elif best_of == "7 rounds":
+                        best_of = "10 rounds"
+                        click_sound.play()
+                    elif best_of == "10 rounds":
+                        best_of = "infinity"
+                        click_sound.play()
+                    else:
+                        best_of = "3 rounds"
+                        click_sound.play()
                 elif text_rect_exit.collidepoint(mouse_pos):
                     pygame.quit()
                     exit()
@@ -1019,7 +1138,135 @@ def starting_screen():
         pygame.display.update()
         clock.tick(60)
 
+# -----------------------------------------------------------------------------------------------------------------
 
+def draw_offer(asking_player):
+    global tanks_playing
+    font = pygame.font.Font(None, 100)
+    cycle_index = 0
+    pygame.mixer.pause()
+
+    while True:
+        draw_background(screen)
+        draw_borders(screen)
+
+        draw_blocks(screen, floor_rect, strait_grass)
+        draw_blocks(screen, underground_rect, strait_dirt)
+
+        for tank in tanks_playing.sprites():
+            try:
+                if tank == tanks_playing.sprites()[current_tank_index]:
+                    display_stats(screen, tank)
+                    tank.draw_parabola(screen)
+            except IndexError:
+                pass
+            tank.draw(screen)
+
+        for bullet in bullets.sprites():
+            bullet.draw()
+
+        if heli.sprite:
+            heli.sprite.draw()
+
+        for box in boxes.sprites():
+            box.draw()
+
+        text = font.render("press ESC for settings", True, "RED")
+        screen.blit(text, (screen_width - 300, screen_height - 35))
+
+        text = font.render(f"player {asking_player} requests a draw", True, "Red")
+        text_rect_exit = text.get_rect(center=(screen_width/2, 200))
+        screen.blit(text, text_rect_exit)
+
+        text = font.render(f"does player {tanks_playing.sprites()[cycle_index].name} accept the draw?", True, "Red")
+        text_rect_exit = text.get_rect(center=(screen_width/2, 300))
+        screen.blit(text, text_rect_exit)
+
+        for ball in range(len(tanks_playing.sprites())):
+            pygame.draw.circle(screen, (50, 50, 50), (screen_width/2-100+200*ball,400), 30 ,3)
+
+        for ball_full in range(cycle_index):
+            pygame.draw.circle(screen, "Cyan", (screen_width / 2 - 100 + 200 * ball_full, 400), 30)
+
+        yes_text = font.render("YES", True, "RED")
+        yes_text_rect = yes_text.get_rect(center=(screen_width / 2 - 200, screen_height / 2+ 200))
+        screen.blit(yes_text, yes_text_rect)
+        pygame.draw.rect(screen, (50, 50, 50), yes_text_rect, 2)
+
+        no_text = font.render("NO", True, "RED")
+        no_text_rect = no_text.get_rect(center=(screen_width / 2 + 200, screen_height / 2+ 200))
+        screen.blit(no_text, no_text_rect)
+        pygame.draw.rect(screen, (50, 50, 50), no_text_rect, 2)
+
+        text = font.render("press ESC to go back (did not reset it is ok)", True, "RED")
+        text_rect = text.get_rect(center=(screen_width / 2, screen_height - 100))
+        screen.blit(text, text_rect)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.mixer.unpause()
+                    return False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if no_text_rect.collidepoint(mouse_pos):
+                    pygame.mixer.unpause()
+                    return False
+                elif yes_text_rect.collidepoint(mouse_pos):
+                    if cycle_index == len(tanks_playing.sprites())-1:
+                        draw_screen(len(tanks_playing.sprites()))
+                        pygame.mixer.unpause()
+                        return True
+                    cycle_index += 1
+
+        pygame.display.update()
+        clock.tick(60)
+
+# -----------------------------------------------------------------------------------------------------------------
+
+def draw_screen(number_of_players):
+    global tanks_playing
+    font = pygame.font.Font(None, 100)
+    for _ in range(100):
+        draw_background(screen)
+        draw_borders(screen)
+
+        draw_blocks(screen, floor_rect, strait_grass)
+        draw_blocks(screen, underground_rect, strait_dirt)
+
+        for tank in tanks_playing.sprites():
+            try:
+                if tank == tanks_playing.sprites()[current_tank_index]:
+                    display_stats(screen, tank)
+                    tank.draw_parabola(screen)
+            except IndexError:
+                pass
+            tank.draw(screen)
+
+        for bullet in bullets.sprites():
+            bullet.draw()
+
+        if heli.sprite:
+            heli.sprite.draw()
+
+        for box in boxes.sprites():
+            box.draw()
+
+        for ball in range(number_of_players):
+            pygame.draw.circle(screen, (50, 50, 50), (screen_width/2-100+200*ball,400), 30 ,3)
+
+        for ball_full in range(number_of_players):
+            pygame.draw.circle(screen, "Cyan", (screen_width / 2 - 100 + 200 * ball_full, 400), 30)
+
+        text = font.render("THIS ROUND IS A DRAW", True, "RED")
+        text_rect = text.get_rect(center=(screen_width / 2, 300))
+        screen.blit(text, text_rect)
+
+        pygame.display.update()
+        clock.tick(60)
 # -----------------------------------------------------------------------------------------------------------------
 
 def collision(tank_rect, objects):
@@ -1027,6 +1274,105 @@ def collision(tank_rect, objects):
         if obj.colliderect(tank_rect):
             return obj
     return None
+
+# -----------------------------------------------------------------------------------------------------------------
+
+def ending_screen(tank_won):
+    global show_picked_item, tanks, tanks_playing, heli, was_helicopter, floor_rect, underground_rect, terrain, spawn_points, level_number, music_status, current_round, wins, best_of, space_background
+    pygame.mixer.pause()
+    while True:
+        screen.blit(space_background, (0, 0))
+        font = pygame.font.Font(None, 50)
+        font_big = pygame.font.Font(None, 100)
+
+        text = font_big.render(f"PLAYER {tank_won.name} HAS WON THE GAME", True, "Cyan")
+        text_rect = text.get_rect(center=(screen_width / 2, screen_height / 2 - 330))
+        screen.blit(text, text_rect)
+
+        text = font.render("press ENTER to go back to main menu", True, "#FFBA00")
+        screen.blit(text, (screen_width - 600, screen_height - 100))
+
+        text = font.render("EXIT", True, (205, 205, 105))
+        text_rect_exit = text.get_rect(center=(screen_width - 100, 100))
+        screen.blit(text, text_rect_exit)
+        pygame.draw.rect(screen, (50, 50, 50), text_rect_exit, 2)
+
+        draw_leader_board()
+
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    pygame.mixer.unpause()
+                    click_sound.play()
+                    channel1.stop()
+                    channel2.stop()
+                    show_picked_item = None
+
+                    bullets.empty()
+                    boxes.empty()
+
+                    current_round = 0
+
+                    number_of_players, yes_or_no, names = starting_screen()
+
+                    if yes_or_no == "YES":
+                        draw_level()
+
+                    floor_rect, underground_rect, terrain, spawn_points, level_number, tracks_index = get_random_level()
+
+                    tanks = pygame.sprite.Group()
+                    if number_of_players == 2:
+                        tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
+                        tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
+                        wins = [0, 0]
+                    elif number_of_players == 3:
+                        tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
+                        tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
+                        tanks.add(Tank(spawn_points[2][0], spawn_points[2][1], names[2]))
+                        wins = [0, 0, 0]
+
+                    tanks_playing = tanks.copy()
+
+                    heli = pygame.sprite.GroupSingle()
+                    heli.add(Helicopter())
+                    heli.sprite.spawn()
+                    was_helicopter = True
+
+                    channel1.play(tracks[tracks_index], -1)
+                    music_status = "on"
+
+                    return
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                if text_rect_exit.collidepoint(mouse_pos):
+                    pygame.quit()
+                    exit()
+
+        pygame.display.update()
+        clock.tick(60)
+
+# -----------------------------------------------------------------------------------------------------------------
+
+def draw_leader_board():
+    global tanks, wins
+    font = pygame.font.Font(None, 100)
+
+    # pygame.draw.rect(screen, "#FFBA00", pygame.rect.Rect(screen_width/2 -250,150,500,500), 2)
+
+    text = font.render("LEADER BOARD", True, "#FFBA00")
+    text_rect_exit = text.get_rect(center=(screen_width / 2, 200))
+    screen.blit(text, text_rect_exit)
+
+    for i in range(len(tanks.sprites())):
+        text = font.render(f"{tanks.sprites()[i].name}", True, "#FFBA00")
+        text_rect_exit = text.get_rect(center=(screen_width / 2-200, 300 + 100 * i))
+        screen.blit(text, text_rect_exit)
+
+        text = font.render(f"{wins[i]}", True, "#FFBA00")
+        text_rect_exit = text.get_rect(center=(screen_width / 2+200, 300 + 100 * i))
+        screen.blit(text, text_rect_exit)
+
+
 
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -1069,17 +1415,27 @@ def draw_blocks(screen, rects, image):
 # -----------------------------------------------------------------------------------------------------------------
 
 def draw_borders(screen, sandbox=False):
-    global show_picked_item
+    global show_picked_item, best_of
     pygame.draw.rect(screen, (50, 50, 50), (0, screen_height - 50, screen_width, 50))
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, 25, screen_height))
     pygame.draw.rect(screen, (50, 50, 50), (screen_width - 25, 0, 25, screen_height))
     pygame.draw.rect(screen, (50, 50, 50), (0, 0, screen_width, 25))
 
     font = pygame.font.Font(None, 75)
-    text = font.render(f"ROUND {current_round}", True, "Black")
+    font_small = pygame.font.Font(None, 35)
     if sandbox:
         text = font.render(f"SANDBOX", True, "Black")
-    screen.blit(text, (screen_width / 2 - 125, 100))
+        text_rect = text.get_rect(center=(screen_width / 2, 100))
+        screen.blit(text, text_rect)
+    else:
+        text = font.render(f"ROUND {current_round}", True, "Black")
+        text_rect = text.get_rect(center=(screen_width / 2, 100))
+        screen.blit(text, text_rect)
+
+        text = font_small.render(f"best of {best_of}", True, "Black")
+        text_rect = text.get_rect(center=(screen_width / 2, 150))
+        screen.blit(text, text_rect)
+
     if show_picked_item != None:
         if show_picked_item[2] > 0:
             text = font.render(f"{show_picked_item[0]} picked up {show_picked_item[1]}", True, '#FDDC5C')
@@ -1180,7 +1536,7 @@ def draw_level():
         draw_blocks(screen, floor_rect, strait_grass)
         draw_blocks(screen, underground_rect, strait_dirt)
 
-        text = font.render("press ESC for controllers", True, "RED")
+        text = font.render("press ESC for settings", True, "RED")
         screen.blit(text, (screen_width - 300, screen_height - 35))
 
         if is_timer:
@@ -1205,12 +1561,15 @@ def draw_level():
 
 
 # -----------------------------------------------------------------------------------------------------------------
-def get_random_level(previous_level_number=None):
+def get_random_level(previous_level_number=None, previous_music_index = -1):
     while True:
         level_number = random.randint(0, len(levels) - 1)
         if level_number != previous_level_number:
             break
-
+    while True:
+        music_index = random.randint(0, len(tracks) - 1)
+        if music_index != previous_music_index:
+            break
     floor_rect_pos = levels[level_number][0]
     underground_rect_pos = levels[level_number][1]
     spawn_points = copy.deepcopy(levels[level_number][2])
@@ -1226,7 +1585,7 @@ def get_random_level(previous_level_number=None):
                         range(len(underground_rect_pos))]
 
     terrain = floor_rect + underground_rect
-    return floor_rect, underground_rect, terrain, random_spawn_points, level_number
+    return floor_rect, underground_rect, terrain, random_spawn_points, level_number, music_index
 
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -1244,16 +1603,18 @@ number_of_players, yes_or_no, names = starting_screen()
 if yes_or_no == "YES":
     draw_level()
 
-floor_rect, underground_rect, terrain, spawn_points, level_number = get_random_level()
+floor_rect, underground_rect, terrain, spawn_points, level_number, tracks_index = get_random_level()
 
 tanks = pygame.sprite.Group()
 if number_of_players == 2:
     tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
     tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
+    wins = [0,0]
 elif number_of_players == 3:
     tanks.add(Tank(spawn_points[0][0], spawn_points[0][1], names[0]))
     tanks.add(Tank(spawn_points[1][0], spawn_points[1][1], names[1]))
     tanks.add(Tank(spawn_points[2][0], spawn_points[2][1], names[2]))
+    wins = [0,0,0]
 
 tanks_playing = tanks.copy()
 
@@ -1301,6 +1662,20 @@ while True:
             elif event.key == pygame.K_9:
                 if not back_to_main_menu():
                     break
+            elif event.key == pygame.K_8:
+                if draw_offer(tanks_playing.sprites()[current_tank_index].name):
+                    if heli.sprite:
+                        heli.sprite.die()
+                    between_rounds_screen()
+                    current_round += 1
+                    heli.add(Helicopter())
+                    heli.sprite.spawn()
+
+    draw_background(screen)
+    draw_borders(screen)
+
+    draw_blocks(screen, floor_rect, strait_grass)
+    draw_blocks(screen, underground_rect, strait_dirt)
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_d]:
@@ -1336,12 +1711,8 @@ while True:
                 tanks_playing.sprites()[current_tank_index].gun_power -= 0.25
         except IndexError:
             pass
-
-    draw_background(screen)
-    draw_borders(screen)
-
-    draw_blocks(screen, floor_rect, strait_grass)
-    draw_blocks(screen, underground_rect, strait_dirt)
+    elif keys[pygame.K_TAB]:
+        draw_leader_board()
 
     for tank in tanks_playing.sprites():
         try:
@@ -1365,7 +1736,7 @@ while True:
         box.update()
         box.draw()
 
-    text = font.render("press ESC for controllers", True, "RED")
+    text = font.render("press ESC for settings", True, "RED")
     screen.blit(text, (screen_width - 300, screen_height - 35))
 
     pygame.display.update()
