@@ -1290,7 +1290,7 @@ def ending_screen(tank_won):
         screen.blit(text, text_rect)
 
         text = font.render("press ENTER to go back to main menu", True, "#FFBA00")
-        screen.blit(text, (screen_width - 600, screen_height - 100))
+        screen.blit(text, (screen_width - 650, screen_height - 100))
 
         text = font.render("EXIT", True, (205, 205, 105))
         text_rect_exit = text.get_rect(center=(screen_width - 100, 100))
