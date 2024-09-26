@@ -1,7 +1,11 @@
 A full python tank couch game to play with friends or family.
-Be aware that the making and saving new levels doesn't work anymore...
 
-Made with pygame completely, music, and menus for information.
+A couch tanks game where you earn money, upgrade your tank and buy different ammo types.
+You fight with others in well made maps, and you can create your own maps to play on with the SandBox feature!
+There is a leaderboard, random air-drops, and much much more!
+Also I added 3 music tracks, and menus for information.
+ 
+Made with pygame COMPLETELY (In only 1 file with 1750 lines, Weird Challenge I know, I suffered so much finding anything...),
 
 Starting screen:
 
@@ -27,3 +31,4 @@ Also there is a SandBox to create your onw levels and maps to play on!
 
 
 AND MUCH MORE!!!
+*(Be aware that the making and saving new levels doesn't work anymore...)*
