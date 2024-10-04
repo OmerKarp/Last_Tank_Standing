@@ -1501,12 +1501,12 @@ def draw_level():
                     elif pygame.Rect(x * 31 + 25, y * 30 + 35, 31, 31) in floor_rect:
                         floor_rect.remove(pygame.Rect(x * 31 + 25, y * 30 + 35, 31, 31))
                         floor_rect_pos.remove([x * 31 + 25, y * 30 + 35])
-                    elif [x, y] in spawn_points:
-                        spawn_points.remove([x, y])
+                    elif [x * 31 + 25, y * 30 + 35] in spawn_points:
+                        spawn_points.remove([x * 31 + 25, y * 30 + 35])
                 elif event.key == pygame.K_w:
                     mouse_pos = pygame.mouse.get_pos()
-                    x = (mouse_pos[0] - 25) // 31
-                    y = (mouse_pos[1] - 35) // 30
+                    x = mouse_pos[0]
+                    y = mouse_pos[1]
                     spawn_points.append([x, y])
                 elif event.key == pygame.K_ESCAPE:
                     sandbox_menu()
@@ -1550,7 +1550,7 @@ def draw_level():
                 timer = 100
 
         for spawn in spawn_points:
-            pygame.draw.circle(screen, "BLUE", (spawn[0] * 31 + 25, spawn[1] * 30 + 35), 10)
+            pygame.draw.circle(screen, "BLUE", (spawn[0], spawn[1]), 10)
 
         pygame.display.update()
         clock.tick(60)

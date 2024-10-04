@@ -1,10 +1,3 @@
-import numpy as np
-import pygame
-import json
-
-screen_width = 1536
-screen_height = 864
-
 levels = [
     [
         [[25, 695], [56, 695], [87, 695], [118, 695], [149, 665], [180, 665], [211, 665], [242, 665],
