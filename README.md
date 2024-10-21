@@ -5,7 +5,9 @@ You fight with others in well made maps, and you can create your own maps to pla
 There is a leaderboard, random air-drops, and much much more!
 Also I added 3 music tracks, and menus for information.
  
-Made with pygame COMPLETELY (In only 1 file with 1750 lines, Weird Challenge I know, I suffered so much finding anything...),
+Made with pygame COMPLETELY (In only 1 file with 1750 lines, Weird Challenge I know, I suffered so much finding anything...)
+
+Also used python for the levels data and not json (because everything bust be with python)
 
 Starting screen:
 
@@ -31,4 +33,4 @@ Also there is a SandBox to create your onw levels and maps to play on!
 
 
 AND MUCH MORE!!!
-*(Be aware that the making and saving new levels doesn't work anymore...)*
+*(Be aware that saving new levels doesn't work anymore...)*
